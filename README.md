@@ -3,6 +3,10 @@
 This repository contains a MIPS CPU originally developed as part of a Computer Architecture and Design lab. The initial implementation is a single-cycle CPU, validated through Modelsim simulations and FPGA testing.
 Here we will attempt to extend and enhance that base design beyond the original lab requirements.
 
+<p align="center">
+  <img width="1000" alt="image" src="https://github.com/user-attachments/assets/77db1384-27f3-4dd7-b8c5-51f68eaf51c0" />
+</p>
+
 ## Origin
 
 The initial implementation was developed for a university lab.
