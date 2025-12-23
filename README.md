@@ -45,3 +45,6 @@ Planned improvements include:
 - Forwarding logic
 
 **Note:** This project is set up for a Basys 3 board, so the XDC file and Vivado project settings should match the Basys 3 device and clock configuration.
+
+<img width="1280" height="1012" alt="image" src="https://github.com/user-attachments/assets/94911193-85e8-4d63-88a0-c1634c602a38" />
+
