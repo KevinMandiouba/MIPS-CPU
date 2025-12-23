@@ -27,11 +27,20 @@ end DATAPATH;
 
 architecture behavior of DATAPATH is
     signal pc_sig           : std_logic_vector(31 downto 0);
+    signal pc_IF_ID         : std_logic_vector(31 downto 0);
+    --signal pc_ID_EX         : std_logic_vector(31 downto 0);
+    --signal pc_EX_MEM        : std_logic_vector(31 downto 0);
+
+
+
     signal next_pc_sig      : std_logic_vector(31 downto 0);
 
     signal rs, rt, rd       : std_logic_vector(4 downto 0);
     signal rs_out, rt_out   : std_logic_vector(31 downto 0);
-    signal instr_sig        : std_logic_vector(31 downto 0);
+
+    signal instr_cache      : std_logic_vector(31 downto 0);
+    signal instr_IF_ID        : std_logic_vector(31 downto 0);
+
     signal ta               : std_logic_vector(25 downto 0);
     signal imm_sig          : std_logic_vector(15 downto 0);
     signal sign_ext_sig     : std_logic_vector(31 downto 0);
@@ -45,15 +54,15 @@ begin
     -- For control unit debugging
     rs_path <= rs_out;
     rt_path <= rt_out;
-    pc_path <= pc_sig;
+    pc_path <= pc_IF_ID;
 
-    ta <= instr_sig(25 downto 0);
-    rs <= instr_sig(25 downto 21);
-    rt <= instr_sig(20 downto 16);
-    rd <= instr_sig(15 downto 11);
-    imm_sig <= instr_sig(15 downto 0);
+    ta <= instr_IF_ID(25 downto 0);
+    rs <= instr_IF_ID(25 downto 21);
+    rt <= instr_IF_ID(20 downto 16);
+    rd <= instr_IF_ID(15 downto 11);
+    imm_sig <= instr_IF_ID(15 downto 0);
 
-    instruction <= instr_sig;
+    instruction <= instr_IF_ID;
  
     alu_y <= rt_out when alu_src = '0' else sign_ext_sig;
  
@@ -75,7 +84,7 @@ begin
      port map(
         rt              => rt_out,
         rs              => rs_out,
-        pc              => pc_sig,
+        pc              => pc_IF_ID,
         target_address  => ta,
         branch_type     => branch_type,
         pc_sel          => pc_sel,
@@ -86,8 +95,19 @@ begin
     U_I_CACHE: entity work.I_CACHE
      port map(
         pc   => pc_sig,
-        instr => instr_sig
+        instr => instr_cache
     );
+
+    -- IF/ID Register
+    U_IF_ID_REG: entity work.IF_ID_REG
+     port map(
+        clk         => clk,
+        reset       => reset,
+        pc          => pc_sig,
+        instr_in    => instr_cache,
+        instr_out   => instr_IF_ID,
+        pc_plus_1   => pc_IF_ID
+     );
 
     -- Sign extend
     U_SIGN_EXTEND: entity work.SIGN_EXTEND
@@ -127,7 +147,7 @@ begin
         din             => reg_din,
         reset           => reset,
         clk             => clk,
-        write           =>reg_write,
+        write           => reg_write,
         read_a          => rs,
         read_b          => rt,
         write_address   => reg_write_addr,
