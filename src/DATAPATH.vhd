@@ -28,22 +28,48 @@ end DATAPATH;
 architecture behavior of DATAPATH is
     signal pc_sig           : std_logic_vector(31 downto 0);
     signal pc_IF_ID         : std_logic_vector(31 downto 0);
-    --signal pc_ID_EX         : std_logic_vector(31 downto 0);
+    signal pc_ID_EX         : std_logic_vector(31 downto 0);
     --signal pc_EX_MEM        : std_logic_vector(31 downto 0);
 
 
 
     signal next_pc_sig      : std_logic_vector(31 downto 0);
 
-    signal rs, rt, rd       : std_logic_vector(4 downto 0);
-    signal rs_out, rt_out   : std_logic_vector(31 downto 0);
+    signal rs, rt, rd               : std_logic_vector(4 downto 0);
+    signal ex_rs, ex_rt, ex_rd      : std_logic_vector(4 downto 0);
+
+    signal id_out_a, id_out_b   : std_logic_vector(31 downto 0);
+    signal ex_out_a, ex_out_b   : std_logic_vector(31 downto 0);
+
+    signal mem_alu_out     : std_logic_vector(31 downto 0);
+    signal mem_store_data  : std_logic_vector(31 downto 0);
+    signal mem_dest_reg    : std_logic_vector(4 downto 0);
+
+    signal mem_mem_write   : std_logic;
+    signal mem_reg_write   : std_logic;
+    signal mem_reg_in_src  : std_logic;
+
+    signal ex_alu_src     : std_logic;
+    signal ex_reg_dst     : std_logic;
+    signal ex_reg_write   : std_logic;
+    signal ex_reg_in_src  : std_logic;
+    signal ex_data_write  : std_logic;
+
+    signal ex_dest_reg     : std_logic_vector(4 downto 0);
 
     signal instr_cache      : std_logic_vector(31 downto 0);
-    signal instr_IF_ID        : std_logic_vector(31 downto 0);
+    signal instr_IF_ID      : std_logic_vector(31 downto 0);
+
+    signal wb_data_out    : std_logic_vector(31 downto 0);
+    signal wb_alu_out     : std_logic_vector(31 downto 0);
+    signal wb_dest_reg    : std_logic_vector(4 downto 0);
+    signal wb_reg_write   : std_logic;
+    signal wb_reg_in_src  : std_logic;
 
     signal ta               : std_logic_vector(25 downto 0);
     signal imm_sig          : std_logic_vector(15 downto 0);
-    signal sign_ext_sig     : std_logic_vector(31 downto 0);
+    signal id_sign_extend     : std_logic_vector(31 downto 0);
+    signal ex_sign_extend     : std_logic_vector(31 downto 0);
     signal alu_out          : std_logic_vector(31 downto 0);
     signal data_out         : std_logic_vector(31 downto 0);
     signal alu_y            : std_logic_vector(31 downto 0);
@@ -52,8 +78,8 @@ architecture behavior of DATAPATH is
 begin
 
     -- For control unit debugging
-    rs_path <= rs_out;
-    rt_path <= rt_out;
+    rs_path <= id_out_a;
+    rt_path <= id_out_b;
     pc_path <= pc_IF_ID;
 
     ta <= instr_IF_ID(25 downto 0);
@@ -64,11 +90,14 @@ begin
 
     instruction <= instr_IF_ID;
  
-    alu_y <= rt_out when alu_src = '0' else sign_ext_sig;
- 
-    reg_din <= data_out when reg_in_src = '0' else alu_out;
+    alu_y <= ex_out_b when ex_alu_src = '0' else ex_sign_extend;     
 
-    reg_write_addr <= rt when reg_dst = '0' else rd;
+    reg_din        <= wb_data_out when wb_reg_in_src = '0' else wb_alu_out;
+
+    reg_write_addr <= wb_dest_reg;
+
+    ex_dest_reg <= ex_rt when ex_reg_dst = '0' else ex_rd;
+
 
     -- Program Counter (PC)
     U_PC_REG: entity work.PC_REG
@@ -82,8 +111,8 @@ begin
     -- Next Address Unit
     U_NEXT_ADDRESS: entity work.NEXT_ADDRESS
      port map(
-        rt              => rt_out,
-        rs              => rs_out,
+        rt              => id_out_b,
+        rs              => id_out_a,
         pc              => pc_IF_ID,
         target_address  => ta,
         branch_type     => branch_type,
@@ -114,13 +143,45 @@ begin
      port map(
         imm             => imm_sig,
         func            => func,
-        sign_ext_out    => sign_ext_sig
+        sign_ext_out    => id_sign_extend
     );
+
+    -- ID/EX Register
+    U_ID_EX_REG: entity work.ID_EX_REG
+     port map(
+        clk             => clk,
+        reset           => reset,
+        id_pc_plus_1    => pc_IF_ID,
+        ex_pc_plus_1    => pc_ID_EX,
+        id_rs           => rs,
+        id_rt           => rt,
+        id_rd           => rd,
+        ex_rs           => ex_rs,
+        ex_rt           => ex_rt,
+        ex_rd           => ex_rd,
+        id_out_a        => id_out_a,
+        id_out_b        => id_out_b,
+        ex_out_a        => ex_out_a,
+        ex_out_b        => ex_out_b,
+        id_sign_extend  => id_sign_extend,
+        ex_sign_extend  => ex_sign_extend,
+        id_alu_src      => alu_src,
+        id_reg_dst      => reg_dst,
+        id_reg_write    => reg_write,
+        id_reg_in_src   => reg_in_src,
+        id_data_write   => data_write,
+        ex_alu_src      => ex_alu_src,
+        ex_reg_dst      => ex_reg_dst,
+        ex_reg_write    => ex_reg_write,
+        ex_reg_in_src   => ex_reg_in_src,
+        ex_data_write   => ex_data_write
+
+     );
 
     -- Arithmethic Logic Unit
     U_ALU: entity work.ALU
      port map(
-        x => rs_out,
+        x => ex_out_a,
         y => alu_y,
         add_sub => add_sub,
         logic_func => logic_func,
@@ -130,16 +191,56 @@ begin
         zero => alu_zero
     );
 
+    -- EX_MEM Register
+     U_EX_MEM_REG: entity work.EX_MEM_REG
+     port map(
+        clk             => clk,
+        reset           => reset,
+        ex_alu_out      => alu_out,
+        mem_alu_out     => mem_alu_out,
+        ex_store_data   => ex_out_b,
+        mem_store_data  => mem_store_data,
+        ex_dest_reg     => ex_dest_reg,
+        mem_dest_reg    => mem_dest_reg,
+        ex_mem_write    => ex_data_write,
+        mem_mem_write   => mem_mem_write,
+        ex_reg_write    => ex_reg_write,
+        mem_reg_write   => mem_reg_write,
+        ex_reg_in_src   => ex_reg_in_src,
+        mem_reg_in_src  => mem_reg_in_src
+    );
+
     -- D-Cache(32x32 locations)
     U_D_CACHE : entity work.D_CACHE
     port map(
-        clk        => clk,
-        reset      => reset,
-        data_write => data_write,
-        addr       => alu_out,
-        d_in       => rt_out,
-        d_out      => data_out
+        clk         => clk,
+        reset       => reset,
+        data_write  => mem_mem_write,
+        addr        => mem_alu_out,
+        d_in        => mem_store_data,
+        d_out       => data_out
     );
+
+    U_MEM_WB_REG: entity work.MEM_WB_REG
+     port map(
+        clk            => clk,
+        reset          => reset,
+
+        mem_data_out   => data_out,
+        mem_alu_out    => mem_alu_out,
+        mem_dest_reg   => mem_dest_reg,
+
+        mem_reg_write  => mem_reg_write,
+        mem_reg_in_src => mem_reg_in_src,
+
+        wb_data_out    => wb_data_out,
+        wb_alu_out     => wb_alu_out,
+        wb_dest_reg    => wb_dest_reg,
+
+        wb_reg_write   => wb_reg_write,
+        wb_reg_in_src  => wb_reg_in_src
+    );
+
 
     -- Register File (32x32 registers)
     U_REGFILE: entity work.REGFILE
@@ -147,11 +248,11 @@ begin
         din             => reg_din,
         reset           => reset,
         clk             => clk,
-        write           => reg_write,
+        write           => wb_reg_write,
         read_a          => rs,
         read_b          => rt,
         write_address   => reg_write_addr,
-        out_a           => rs_out,
-        out_b           => rt_out
+        out_a           => id_out_a,
+        out_b           => id_out_b
     );
 end behavior;
