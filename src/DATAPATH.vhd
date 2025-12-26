@@ -26,55 +26,56 @@ port(
 end DATAPATH;
 
 architecture behavior of DATAPATH is
-    signal pc_sig           : std_logic_vector(31 downto 0);
-    signal pc_IF_ID         : std_logic_vector(31 downto 0);
-    signal pc_ID_EX         : std_logic_vector(31 downto 0);
-    --signal pc_EX_MEM        : std_logic_vector(31 downto 0);
+    signal pc_sig               : std_logic_vector(31 downto 0);
+    signal pc_IF_ID             : std_logic_vector(31 downto 0);
+    signal pc_ID_EX             : std_logic_vector(31 downto 0);
 
+    signal next_pc_sig          : std_logic_vector(31 downto 0);
 
-
-    signal next_pc_sig      : std_logic_vector(31 downto 0);
-
-    signal rs, rt, rd               : std_logic_vector(4 downto 0);
-    signal ex_rs, ex_rt, ex_rd      : std_logic_vector(4 downto 0);
+    signal rs, rt, rd           : std_logic_vector(4 downto 0);
+    signal ex_rs, ex_rt, ex_rd  : std_logic_vector(4 downto 0);
 
     signal id_out_a, id_out_b   : std_logic_vector(31 downto 0);
     signal ex_out_a, ex_out_b   : std_logic_vector(31 downto 0);
 
-    signal mem_alu_out     : std_logic_vector(31 downto 0);
-    signal mem_store_data  : std_logic_vector(31 downto 0);
-    signal mem_dest_reg    : std_logic_vector(4 downto 0);
+    signal mem_alu_out          : std_logic_vector(31 downto 0);
+    signal mem_store_data       : std_logic_vector(31 downto 0);
+    signal mem_dest_reg         : std_logic_vector(4 downto 0);
 
-    signal mem_mem_write   : std_logic;
-    signal mem_reg_write   : std_logic;
-    signal mem_reg_in_src  : std_logic;
+    signal mem_mem_write        : std_logic;
+    signal mem_reg_write        : std_logic;
+    signal mem_reg_in_src       : std_logic;
 
-    signal ex_alu_src     : std_logic;
-    signal ex_reg_dst     : std_logic;
-    signal ex_reg_write   : std_logic;
-    signal ex_reg_in_src  : std_logic;
-    signal ex_data_write  : std_logic;
+    signal ex_alu_src           : std_logic;
+    signal ex_reg_dst           : std_logic;
+    signal ex_reg_write         : std_logic;
+    signal ex_reg_in_src        : std_logic;
+    signal ex_data_write        : std_logic;
 
-    signal ex_dest_reg     : std_logic_vector(4 downto 0);
+    signal ex_dest_reg          : std_logic_vector(4 downto 0);
 
-    signal instr_cache      : std_logic_vector(31 downto 0);
-    signal instr_IF_ID      : std_logic_vector(31 downto 0);
+    signal instr_cache          : std_logic_vector(31 downto 0);
+    signal instr_IF_ID          : std_logic_vector(31 downto 0);
 
-    signal wb_data_out    : std_logic_vector(31 downto 0);
-    signal wb_alu_out     : std_logic_vector(31 downto 0);
-    signal wb_dest_reg    : std_logic_vector(4 downto 0);
-    signal wb_reg_write   : std_logic;
-    signal wb_reg_in_src  : std_logic;
+    signal wb_data_out          : std_logic_vector(31 downto 0);
+    signal wb_alu_out           : std_logic_vector(31 downto 0);
+    signal wb_dest_reg          : std_logic_vector(4 downto 0);
+    signal wb_reg_write         : std_logic;
+    signal wb_reg_in_src        : std_logic;
 
-    signal ta               : std_logic_vector(25 downto 0);
-    signal imm_sig          : std_logic_vector(15 downto 0);
-    signal id_sign_extend     : std_logic_vector(31 downto 0);
-    signal ex_sign_extend     : std_logic_vector(31 downto 0);
-    signal alu_out          : std_logic_vector(31 downto 0);
-    signal data_out         : std_logic_vector(31 downto 0);
-    signal alu_y            : std_logic_vector(31 downto 0);
-    signal reg_din          : std_logic_vector(31 downto 0);
-    signal reg_write_addr   : std_logic_vector(4 downto 0);
+    signal ta                   : std_logic_vector(25 downto 0);
+    signal imm_sig              : std_logic_vector(15 downto 0);
+    signal id_sign_extend       : std_logic_vector(31 downto 0);
+    signal ex_sign_extend       : std_logic_vector(31 downto 0);
+    signal alu_out              : std_logic_vector(31 downto 0);
+    signal data_out             : std_logic_vector(31 downto 0);
+    signal alu_y                : std_logic_vector(31 downto 0);
+    signal reg_din              : std_logic_vector(31 downto 0);
+    signal reg_write_addr       : std_logic_vector(4 downto 0);
+
+    signal ForwardA, ForwardB   : std_logic_vector(1 downto 0);
+    signal for_alu_x, for_alu_y : std_logic_vector(31 downto 0);
+    signal mem_forward_val      : std_logic_vector(31 downto 0);
 begin
 
     -- For control unit debugging
@@ -90,7 +91,7 @@ begin
 
     instruction <= instr_IF_ID;
  
-    alu_y <= ex_out_b when ex_alu_src = '0' else ex_sign_extend;     
+    alu_y <= for_alu_y when ex_alu_src = '0' else ex_sign_extend;     
 
     reg_din        <= wb_data_out when wb_reg_in_src = '0' else wb_alu_out;
 
@@ -98,6 +99,20 @@ begin
 
     ex_dest_reg <= ex_rt when ex_reg_dst = '0' else ex_rd;
 
+    -- Forwarding
+    mem_forward_val <= data_out when mem_reg_in_src='0' else mem_alu_out;
+
+    with ForwardA select -- Rs
+    for_alu_x <=
+        reg_din         when "01",      -- Forward from wb
+        mem_forward_val when "10",      -- Forward from mem
+        ex_out_a        when others;    -- No forwarding     
+        
+    with ForwardB select -- Rt
+    for_alu_y <=
+        reg_din         when "01",      -- Forward from wb
+        mem_forward_val when "10",      -- Forward from mem
+        ex_out_b        when others;    -- No forwarding 
 
     -- Program Counter (PC)
     U_PC_REG: entity work.PC_REG
@@ -181,7 +196,7 @@ begin
     -- Arithmethic Logic Unit
     U_ALU: entity work.ALU
      port map(
-        x => ex_out_a,
+        x => for_alu_x,
         y => alu_y,
         add_sub => add_sub,
         logic_func => logic_func,
@@ -191,6 +206,26 @@ begin
         zero => alu_zero
     );
 
+    -- Forwarding Unit
+    U_FORWARDING_UNIT: entity work.FORWARDING_UNIT
+     port map(
+        -- Rs and Rt in next instruction
+        ex_rs           => ex_rs,
+        ex_rt           => ex_rt,
+
+        -- Rd from current instruction
+        mem_dest_reg    => mem_dest_reg,
+        wb_dest_reg     => wb_dest_reg,
+
+        -- RegWrite status
+        mem_reg_write   => mem_reg_write,
+        wb_reg_write    => wb_reg_write,
+
+        -- Forwarding
+        ForwardA        => ForwardA,
+        ForwardB        => ForwardB
+    );
+
     -- EX_MEM Register
      U_EX_MEM_REG: entity work.EX_MEM_REG
      port map(
@@ -198,7 +233,7 @@ begin
         reset           => reset,
         ex_alu_out      => alu_out,
         mem_alu_out     => mem_alu_out,
-        ex_store_data   => ex_out_b,
+        ex_store_data   => for_alu_y,
         mem_store_data  => mem_store_data,
         ex_dest_reg     => ex_dest_reg,
         mem_dest_reg    => mem_dest_reg,
