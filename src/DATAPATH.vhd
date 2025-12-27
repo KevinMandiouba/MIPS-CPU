@@ -76,6 +76,15 @@ architecture behavior of DATAPATH is
     signal ForwardA, ForwardB   : std_logic_vector(1 downto 0);
     signal for_alu_x, for_alu_y : std_logic_vector(31 downto 0);
     signal mem_forward_val      : std_logic_vector(31 downto 0);
+
+    signal id_MemRead           : std_logic;
+    signal ex_MemRead           : std_logic;
+    signal IF_ID_write          : std_logic;
+    signal ID_EX_flush          : std_logic;
+    signal pc_write             : std_logic;
+    signal id_uses_rt           : std_logic;
+    signal id_opcode            : std_logic_vector(5 downto 0);
+
 begin
 
     -- For control unit debugging
@@ -88,16 +97,26 @@ begin
     rt <= instr_IF_ID(20 downto 16);
     rd <= instr_IF_ID(15 downto 11);
     imm_sig <= instr_IF_ID(15 downto 0);
+    id_opcode <= instr_IF_ID(31 downto 26);
 
-    instruction <= instr_IF_ID;
+    instruction     <= instr_IF_ID;
  
-    alu_y <= for_alu_y when ex_alu_src = '0' else ex_sign_extend;     
+    alu_y           <= for_alu_y when ex_alu_src = '0' else ex_sign_extend;     
 
-    reg_din        <= wb_data_out when wb_reg_in_src = '0' else wb_alu_out;
+    reg_din         <= wb_data_out when wb_reg_in_src = '0' else wb_alu_out;
 
-    reg_write_addr <= wb_dest_reg;
+    reg_write_addr  <= wb_dest_reg;
 
-    ex_dest_reg <= ex_rt when ex_reg_dst = '0' else ex_rd;
+    ex_dest_reg     <= ex_rt when ex_reg_dst = '0' else ex_rd;
+
+    -- Stalling
+    id_MemRead <= (not reg_in_src) and reg_write;
+
+    id_uses_rt <= '1' when (id_opcode = "000000") or    -- R-type
+                        (id_opcode = "101011") or       -- sw
+                        (id_opcode = "000100") or       -- beq
+                        (id_opcode = "000101")          -- bne
+                else '0';
 
     -- Forwarding
     mem_forward_val <= data_out when mem_reg_in_src='0' else mem_alu_out;
@@ -120,7 +139,8 @@ begin
         clk     => clk,
         reset   => reset,
         next_pc => next_pc_sig,
-        pc      => pc_sig
+        pc      => pc_sig,
+        pc_write=> pc_write
     );
 
     -- Next Address Unit
@@ -138,8 +158,8 @@ begin
     -- I-Cache
     U_I_CACHE: entity work.I_CACHE
      port map(
-        pc   => pc_sig,
-        instr => instr_cache
+        pc      => pc_sig,
+        instr   => instr_cache
     );
 
     -- IF/ID Register
@@ -150,8 +170,22 @@ begin
         pc          => pc_sig,
         instr_in    => instr_cache,
         instr_out   => instr_IF_ID,
-        pc_plus_1   => pc_IF_ID
+        pc_plus_1   => pc_IF_ID,
+        IF_ID_write => IF_ID_write
      );
+
+    -- Hazard Detection Unit
+    U_HAZARD_DET_UNIT: entity work.HAZARD_DET_UNIT
+     port map(
+        rs          => rs,
+        rt          => rt,
+        ex_rt       => ex_rt,
+        ex_MemRead  => ex_MemRead,
+        pc_write    => pc_write,
+        IF_ID_write => IF_ID_write,
+        ID_EX_flush => ID_EX_flush,
+        id_uses_rt  => id_uses_rt
+    );
 
     -- Sign extend
     U_SIGN_EXTEND: entity work.SIGN_EXTEND
@@ -189,21 +223,23 @@ begin
         ex_reg_dst      => ex_reg_dst,
         ex_reg_write    => ex_reg_write,
         ex_reg_in_src   => ex_reg_in_src,
-        ex_data_write   => ex_data_write
-
+        ex_data_write   => ex_data_write,
+        id_MemRead      => id_MemRead,
+        ex_MemRead      => ex_MemRead,
+        ID_EX_flush     => ID_EX_flush
      );
 
     -- Arithmethic Logic Unit
     U_ALU: entity work.ALU
      port map(
-        x => for_alu_x,
-        y => alu_y,
-        add_sub => add_sub,
-        logic_func => logic_func,
-        func => func,
-        output => alu_out,
-        overflow => alu_overflow,
-        zero => alu_zero
+        x           => for_alu_x,
+        y           => alu_y,
+        add_sub     => add_sub,
+        logic_func  => logic_func,
+        func        => func,
+        output      => alu_out,
+        overflow    => alu_overflow,
+        zero        => alu_zero
     );
 
     -- Forwarding Unit

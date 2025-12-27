@@ -23,7 +23,10 @@ port(
     ex_reg_dst      : out std_logic;
     ex_reg_write    : out std_logic;
     ex_reg_in_src   : out std_logic;
-    ex_data_write   : out std_logic
+    ex_data_write   : out std_logic;
+    id_MemRead      : in std_logic;
+    ex_MemRead      : out std_logic;
+    ID_EX_flush     : in std_logic
 );
 end ID_EX_REG;
 
@@ -45,6 +48,7 @@ begin
             ex_reg_write    <= '0';
             ex_reg_in_src   <= '0';
             ex_data_write   <= '0';
+            ex_MemRead      <= '0';
 
         elsif rising_edge(clk) then
             ex_pc_plus_1    <= id_pc_plus_1;
@@ -55,11 +59,23 @@ begin
             ex_out_b        <= id_out_b;
             ex_sign_extend  <= id_sign_extend;
 
-            ex_alu_src      <= id_alu_src;
-            ex_reg_dst      <= id_reg_dst;
-            ex_reg_write    <= id_reg_write;
-            ex_reg_in_src   <= id_reg_in_src;
-            ex_data_write   <= id_data_write;
+            --Controls
+            if ID_EX_flush = '1' then
+                ex_reg_write    <= '0';
+                ex_data_write   <= '0';
+                ex_alu_src      <= '0';
+                ex_reg_dst      <= '0';
+                ex_reg_in_src   <= '0';
+                ex_MemRead      <= '0';
+    
+            else
+                ex_alu_src      <= id_alu_src;
+                ex_reg_dst      <= id_reg_dst;
+                ex_reg_write    <= id_reg_write;
+                ex_reg_in_src   <= id_reg_in_src;
+                ex_data_write   <= id_data_write;
+                ex_MemRead      <= id_MemRead;
+            end if;
         end if;
     end process;
 end behavior;

@@ -6,7 +6,8 @@ entity PC_REG is
 port(   clk     : in std_logic;
         reset   : in std_logic;
         next_pc : in std_logic_vector(31 downto 0);
-        pc      : out std_logic_vector(31 downto 0)
+        pc      : out std_logic_vector(31 downto 0);
+        pc_write: in std_logic -- stalling
     );
 end PC_REG;
 
@@ -17,7 +18,12 @@ begin
         if reset = '1' then
             pc <= (others => '0');
         elsif rising_edge(clk) then
-            pc <= next_pc;
+            if pc_write = '1' then
+                pc <= next_pc;
+            else
+                -- Same PC as before
+                -- Stalling
+            end if;
         end if;
     end process;
 end behavior;
