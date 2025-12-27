@@ -9,7 +9,12 @@ port(   rt, rs          : in std_logic_vector(31 downto 0);
         target_address  : in std_logic_vector(25 downto 0);
         branch_type     : in std_logic_vector(1 downto 0);
         pc_sel          : in std_logic_vector(1 downto 0);
-        next_pc         : out std_logic_vector(31 downto 0));
+        next_pc         : out std_logic_vector(31 downto 0);
+
+        -- Control Hazards
+        pc_redirect     : out std_logic;
+        redirect_target : out std_logic_vector(31 downto 0)
+);
 end NEXT_ADDRESS;
 
 architecture behavior of NEXT_ADDRESS is
@@ -21,6 +26,9 @@ architecture behavior of NEXT_ADDRESS is
     signal branching    :  signed(31 downto 0);
     signal reg_comp     :  std_logic;
     signal slt          :  std_logic;
+
+    -- Branch Prediction
+    signal branch_taken : std_logic;
 begin
 
     -- Sign extend
@@ -38,21 +46,21 @@ begin
     begin 
         case branch_type is
             when "00" => -- No Branch
-                branching <= to_signed(1, 32);
+                branching <= to_signed(0, 32);
 
             when "01" => -- BEQ
-                if (reg_comp = '0') then branching <= to_signed(1, 32);
-                else branching <= sign_extend + to_signed(1, 32);
+                if (reg_comp = '0') then branching <= to_signed(0, 32);
+                else branching <= sign_extend + to_signed(0, 32);
                 end if;
 
             when "10" => -- BNE
-                if (reg_comp = '1') then branching <= to_signed(1, 32);
-                else branching <= sign_extend + to_signed(1, 32);
+                if (reg_comp = '1') then branching <= to_signed(0, 32);
+                else branching <= sign_extend + to_signed(0, 32);
                 end if;
 
             when others => -- BLTZ
-                if (slt = '0') then branching <= to_signed(1, 32);
-                else branching <= sign_extend + to_signed(1, 32);
+                if (slt = '0') then branching <= to_signed(0, 32);
+                else branching <= sign_extend + to_signed(0, 32);
                 end if;
         end case;
     end process;
@@ -68,4 +76,17 @@ begin
                 jump_address    when "01",
                 rs              when "10",
                 (others => '0') when others;
+
+    -- Predict not taken
+    branch_taken    <= '1' when (branching /= to_signed(0,32)) else '0';
+
+    pc_redirect     <=  branch_taken when (pc_sel = "00") else  -- normal path (may branch)
+                        '1' when (pc_sel = "01") else  -- J
+                        '1' when (pc_sel = "10") else  -- JR
+                        '0';
+
+    redirect_target <=  no_jump       when (pc_sel = "00") else
+                        jump_address  when (pc_sel = "01") else
+                        rs            when (pc_sel = "10") else
+                        (others => '0');
 end behavior;
