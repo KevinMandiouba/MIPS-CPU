@@ -14,6 +14,16 @@ Details about the original CPU design and testing can be found in the lab report
 
 All new work in this repository builds on top of that base implementation.
 
+## Future Work
+
+Planned improvements include:
+
+- [x] Pipelining
+- [x] Hazard handling
+- [x] Forwarding logic
+- [ ] Dynamic branch prediction
+- [ ] Exception + interrupt handling
+
 ## Structure
 
 `src/` — VHDL source files
@@ -39,14 +49,6 @@ All new work in this repository builds on top of that base implementation.
 - When adding sources, add all VHDL files from the src directory and make sure “Copy sources into project” is not checked so the files are referenced directly.
 - Add the constraint file from the constraints directory.
 - Once sources and constraints are added, run synthesis and implementation as usual, or just run Bitstream directly.
-
-## Future Work
-
-Planned improvements include:
-
-- Pipelining
-- Hazard handling
-- Forwarding logic
 
 **Note:** This project is set up for a Basys 3 board, so the XDC file and Vivado project settings should match the Basys 3 device and clock configuration.
 
