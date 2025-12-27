@@ -85,12 +85,29 @@ architecture behavior of DATAPATH is
     signal id_uses_rt           : std_logic;
     signal id_opcode            : std_logic_vector(5 downto 0);
 
+    signal id_pc_redirect      : std_logic;
+    signal id_redirect_target  : std_logic_vector(31 downto 0);
+
+    signal if_pc_plus_1  : std_logic_vector(31 downto 0);
+    signal if_next_pc    : std_logic_vector(31 downto 0);
+
+    signal id_flush_if_id : std_logic;
+
+    signal pc_write_final : std_logic;
+    signal ex_add_sub : std_logic;
+    signal ex_logic_func : std_logic_vector(1 downto 0);
+    signal ex_func : std_logic_vector(1 downto 0);
+
+    signal id_rs_val    : std_logic_vector(31 downto 0);
+    signal id_rt_val    : std_logic_vector(31 downto 0);
+    signal id_pc_redirect_valid : std_logic;
+
 begin
 
     -- For control unit debugging
-    rs_path <= id_out_a;
-    rt_path <= id_out_b;
-    pc_path <= pc_IF_ID;
+    rs_path <= id_rs_val;
+    rt_path <= id_rt_val;
+    pc_path <= pc_sig;
 
     ta <= instr_IF_ID(25 downto 0);
     rs <= instr_IF_ID(25 downto 21);
@@ -133,6 +150,32 @@ begin
         mem_forward_val when "10",      -- Forward from mem
         ex_out_b        when others;    -- No forwarding 
 
+    -- Control Hazard
+    -- if stage
+    if_pc_plus_1 <= std_logic_vector(unsigned(pc_sig) + 1);
+
+    if_next_pc <= id_redirect_target when id_pc_redirect_valid = '1'
+                else if_pc_plus_1;
+
+    next_pc_sig <= if_next_pc;
+
+    -- id stage
+    id_pc_redirect_valid <= id_pc_redirect and IF_ID_write; -- or `and pc_write`
+
+    id_flush_if_id <= id_pc_redirect_valid;
+    pc_write_final <= pc_write;  -- no OR here
+
+    -- Forward to ID stage for branch/JR compare
+    id_rs_val <= alu_out when (ex_reg_write = '1' and ex_reg_in_src = '1' and ex_dest_reg /= "00000" and ex_dest_reg = rs) else
+                mem_forward_val when (mem_reg_write = '1' and mem_dest_reg /= "00000" and mem_dest_reg = rs) else
+                reg_din         when (wb_reg_write  = '1' and wb_dest_reg  /= "00000" and wb_dest_reg  = rs) else
+                id_out_a;
+
+    id_rt_val <= alu_out when (ex_reg_write = '1' and ex_reg_in_src = '1' and ex_dest_reg /= "00000" and ex_dest_reg = rt) else
+                mem_forward_val when (mem_reg_write = '1' and mem_dest_reg /= "00000" and mem_dest_reg = rt) else
+                reg_din         when (wb_reg_write  = '1' and wb_dest_reg  /= "00000" and wb_dest_reg  = rt) else
+                id_out_b;
+
     -- Program Counter (PC)
     U_PC_REG: entity work.PC_REG
      port map(
@@ -140,19 +183,22 @@ begin
         reset   => reset,
         next_pc => next_pc_sig,
         pc      => pc_sig,
-        pc_write=> pc_write
+        pc_write=> pc_write_final
     );
 
     -- Next Address Unit
     U_NEXT_ADDRESS: entity work.NEXT_ADDRESS
      port map(
-        rt              => id_out_b,
-        rs              => id_out_a,
+        rt              => id_rt_val,
+        rs              => id_rs_val,
         pc              => pc_IF_ID,
         target_address  => ta,
         branch_type     => branch_type,
         pc_sel          => pc_sel,
-        next_pc         => next_pc_sig
+        next_pc         => open,
+        pc_redirect     => id_pc_redirect,
+        redirect_target => id_redirect_target
+
     );
 
     -- I-Cache
@@ -171,7 +217,8 @@ begin
         instr_in    => instr_cache,
         instr_out   => instr_IF_ID,
         pc_plus_1   => pc_IF_ID,
-        IF_ID_write => IF_ID_write
+        IF_ID_write => IF_ID_write,
+        flush => id_flush_if_id 
      );
 
     -- Hazard Detection Unit
@@ -226,7 +273,13 @@ begin
         ex_data_write   => ex_data_write,
         id_MemRead      => id_MemRead,
         ex_MemRead      => ex_MemRead,
-        ID_EX_flush     => ID_EX_flush
+        ID_EX_flush     => ID_EX_flush,
+        id_add_sub      => add_sub, 
+        id_logic_func   => logic_func, 
+        id_func         => func,
+        ex_add_sub      => ex_add_sub, 
+        ex_logic_func   => ex_logic_func, 
+        ex_func         => ex_func
      );
 
     -- Arithmethic Logic Unit
@@ -234,9 +287,9 @@ begin
      port map(
         x           => for_alu_x,
         y           => alu_y,
-        add_sub     => add_sub,
-        logic_func  => logic_func,
-        func        => func,
+        add_sub     => ex_add_sub,
+        logic_func  => ex_logic_func,
+        func        => ex_func,
         output      => alu_out,
         overflow    => alu_overflow,
         zero        => alu_zero
