@@ -8,8 +8,13 @@ port(
     clk : in std_logic; 
     rs_out, rt_out : out std_logic_vector(3 downto 0); 
     --output ports from register file 
-    pc_out : out std_logic_vector(3 downto 0); --pc reg 
-    overflow, zero : out std_logic 
+    --pc_out : out std_logic_vector(3 downto 0); --pc reg 
+    overflow, zero : out std_logic;
+    
+    -- 7 Segment Display
+    display_clk : in std_logic;
+    display_out : out std_logic_vector(7 downto 0);
+    display_an  : out std_logic_vector(3 downto 0)
 ); 
 end CPU;
 
@@ -30,14 +35,30 @@ architecture behavior of CPU is
     signal logic_func       : std_logic_vector(1 downto 0);
     signal func             : std_logic_vector(1 downto 0);
     signal instruction      : std_logic_vector(31 downto 0);
+    
+    -- 7 Segment Display
+    signal display_out_sig  : std_logic_vector(7 downto 0);
+    signal display_an_sig   : std_logic_vector(3 downto 0);
 begin
 
     rs_out  <= rs_sig(3 downto 0);
     rt_out  <= rt_sig(3 downto 0);
-    pc_out  <= pc_sig(3 downto 0);
+    --pc_out  <= pc_sig(3 downto 0);
 
     opcode  <= instruction(31 downto 26);
-    funct   <= instruction(5 downto 0); 
+    funct   <= instruction(5 downto 0);
+    
+    -- 7 Segment Display
+    U_seven_seg_display : entity work.seven_seg_display
+    port map(
+        clk         => display_clk,
+        value       => pc_sig(4 downto 0),
+        display     => display_out_sig,
+        an          => display_an_sig
+    );
+    
+    display_out <= display_out_sig;
+    display_an  <= display_an_sig;
 
     -- Control Unit
     process(opcode, funct)
