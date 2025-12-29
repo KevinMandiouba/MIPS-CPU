@@ -50,7 +50,7 @@ Planned improvements include:
 - Add the constraint file from the constraints directory.
 - Once sources and constraints are added, run synthesis and implementation as usual, or just run Bitstream directly.
 
-**Note:** This project targets the Basys3 FPGA board, so the XDC file and Vivado project settings match that device's specs. When simulating in ModelSim, comment out the debounce logic in 'CPU.vhd' (use 'Ctrl + /') and connect the datapath's clock directly to 'clk' instead of 'CLK_100MHZ'. The debounce module is intended for FPGA hardware only.
+**Note:** This project targets the Basys3 FPGA board, so the XDC file and Vivado project settings match that device's specs. When simulating in ModelSim, comment out the debounce logic in `CPU.vhd` (use `Ctrl + /`) and connect the datapath's clock directly to `clk` instead of `CLK_100MHZ`. The debounce module is intended for FPGA hardware only.
 
 <p align="center">
   <img width="500" alt="image" src="https://github.com/user-attachments/assets/94911193-85e8-4d63-88a0-c1634c602a38" />
