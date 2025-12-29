@@ -88,18 +88,18 @@ architecture behavior of DATAPATH is
     signal id_pc_redirect      : std_logic;
     signal id_redirect_target  : std_logic_vector(31 downto 0);
 
-    signal if_pc_plus_1  : std_logic_vector(31 downto 0);
-    signal if_next_pc    : std_logic_vector(31 downto 0);
+    signal if_pc_plus_1         : std_logic_vector(31 downto 0);
+    signal if_next_pc           : std_logic_vector(31 downto 0);
 
-    signal id_flush_if_id : std_logic;
+    signal id_flush_if_id       : std_logic;
 
-    signal pc_write_final : std_logic;
-    signal ex_add_sub : std_logic;
-    signal ex_logic_func : std_logic_vector(1 downto 0);
-    signal ex_func : std_logic_vector(1 downto 0);
+    signal pc_write_final       : std_logic;
+    signal ex_add_sub           : std_logic;
+    signal ex_logic_func        : std_logic_vector(1 downto 0);
+    signal ex_func              : std_logic_vector(1 downto 0);
 
-    signal id_rs_val    : std_logic_vector(31 downto 0);
-    signal id_rt_val    : std_logic_vector(31 downto 0);
+    signal id_rs_val            : std_logic_vector(31 downto 0);
+    signal id_rt_val            : std_logic_vector(31 downto 0);
     signal id_pc_redirect_valid : std_logic;
 
 begin
@@ -116,15 +116,15 @@ begin
     imm_sig <= instr_IF_ID(15 downto 0);
     id_opcode <= instr_IF_ID(31 downto 26);
 
-    instruction     <= instr_IF_ID;
+    instruction <= instr_IF_ID;
  
-    alu_y           <= for_alu_y when ex_alu_src = '0' else ex_sign_extend;     
+    alu_y <= for_alu_y when ex_alu_src = '0' else ex_sign_extend;     
 
-    reg_din         <= wb_data_out when wb_reg_in_src = '0' else wb_alu_out;
+    reg_din <= wb_data_out when wb_reg_in_src = '0' else wb_alu_out;
 
-    reg_write_addr  <= wb_dest_reg;
+    reg_write_addr <= wb_dest_reg;
 
-    ex_dest_reg     <= ex_rt when ex_reg_dst = '0' else ex_rd;
+    ex_dest_reg <= ex_rt when ex_reg_dst = '0' else ex_rd;
 
     -- Stalling
     id_MemRead <= (not reg_in_src) and reg_write;

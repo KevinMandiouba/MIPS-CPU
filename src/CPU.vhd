@@ -4,17 +4,17 @@ use IEEE.numeric_std.all;
 
 entity CPU is 
 port( 
-    reset : in std_logic; 
-    clk : in std_logic; 
-    rs_out, rt_out : out std_logic_vector(3 downto 0); 
+    reset           : in std_logic; 
+    clk             : in std_logic; 
+    rs_out, rt_out  : out std_logic_vector(4 downto 0); 
     --output ports from register file 
     --pc_out : out std_logic_vector(3 downto 0); --pc reg 
-    overflow, zero : out std_logic;
+    overflow, zero  : out std_logic;
     
     -- 7 Segment Display
-    display_clk : in std_logic;
-    display_out : out std_logic_vector(7 downto 0);
-    display_an  : out std_logic_vector(3 downto 0)
+    CLK_100MHZ      : in std_logic;
+    display_out     : out std_logic_vector(7 downto 0);
+    display_an      : out std_logic_vector(3 downto 0)
 ); 
 end CPU;
 
@@ -39,10 +39,14 @@ architecture behavior of CPU is
     -- 7 Segment Display
     signal display_out_sig  : std_logic_vector(7 downto 0);
     signal display_an_sig   : std_logic_vector(3 downto 0);
+    
+    -- Debouncing
+    signal debounce         : std_logic;
+    signal debounce_reset   : std_logic;
 begin
 
-    rs_out  <= rs_sig(3 downto 0);
-    rt_out  <= rt_sig(3 downto 0);
+    rs_out  <= rs_sig(4 downto 0);
+    rt_out  <= rt_sig(4 downto 0);
     --pc_out  <= pc_sig(3 downto 0);
 
     opcode  <= instruction(31 downto 26);
@@ -51,7 +55,7 @@ begin
     -- 7 Segment Display
     U_seven_seg_display : entity work.seven_seg_display
     port map(
-        clk         => display_clk,
+        clk         => CLK_100MHZ,
         value       => pc_sig(4 downto 0),
         display     => display_out_sig,
         an          => display_an_sig
@@ -60,6 +64,40 @@ begin
     display_out <= display_out_sig;
     display_an  <= display_an_sig;
 
+    -- Button Debounce
+    U_BUTTON_DEBOUNCE : entity work.BUTTON_DEBOUNCE
+    port map(
+        clk         => CLK_100MHZ,
+        reset       => debounce_reset,
+        input       => clk,
+        debounce    => debounce
+    );
+    
+    debounce_reset <= not reset;
+    
+    -- Datapath
+    U_DATAPATH : entity work.DATAPATH
+    port map(
+        clk         => debounce,
+        reset       => reset,
+        pc_sel      => pc_sel,
+        branch_type => branch_type,
+        alu_src     => alu_src,
+        reg_dst     => reg_dst,
+        reg_write   => reg_write,
+        reg_in_src  => reg_in_src,
+        data_write  => data_write,
+        add_sub     => add_sub,
+        logic_func  => logic_func,
+        func        => func,
+        instruction => instruction,
+        alu_zero    => zero,
+        alu_overflow=> overflow,
+        rs_path     => rs_sig,
+        rt_path     => rt_sig,
+        pc_path     => pc_sig
+    );
+    
     -- Control Unit
     process(opcode, funct)
     begin
@@ -338,28 +376,4 @@ begin
             null;
         end case;
     end process;
-
-    -- Datapath
-    U_DATAPATH : entity work.DATAPATH
-    port map(
-        clk         => clk,
-        reset       => reset,
-        pc_sel      => pc_sel,
-        branch_type => branch_type,
-        alu_src     => alu_src,
-        reg_dst     => reg_dst,
-        reg_write   => reg_write,
-        reg_in_src  => reg_in_src,
-        data_write  => data_write,
-        add_sub     => add_sub,
-        logic_func  => logic_func,
-        func        => func,
-        instruction => instruction,
-        alu_zero    => zero,
-        alu_overflow=> overflow,
-        rs_path     => rs_sig,
-        rt_path     => rt_sig,
-        pc_path     => pc_sig
-    );
-
 end behavior;
