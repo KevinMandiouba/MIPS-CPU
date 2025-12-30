@@ -6,6 +6,8 @@ add wave -unsigned pc_sig
 add wave -unsigned rs_sig
 add wave -unsigned rt_sig
 
+add wave -unsigned /U_DATAPATH/U_REGFILE/registers
+
 radix hex
 
 force reset 1

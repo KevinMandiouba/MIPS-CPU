@@ -23,15 +23,20 @@ architecture behavior of REGFILE is
 
 begin
 
-        out_a <= registers(to_integer(unsigned(read_a)));
-        out_b <= registers(to_integer(unsigned(read_b)));
+        out_a   <= (others => '0') when read_a = "00000" else
+                din when (write = '1' and write_address /= "00000" and write_address = read_a) else
+                registers(to_integer(unsigned(read_a)));
+
+        out_b   <= (others => '0') when read_b = "00000" else
+                din when (write = '1' and write_address /= "00000" and write_address = read_b) else
+                registers(to_integer(unsigned(read_b)));
 
         process(clk, reset)
         begin 
                 if reset = '1' then
                         registers <=(others => (others => '0'));
                 elsif rising_edge(clk) then
-                        if write = '1' then
+                        if write = '1' and write_address /= "00000" then
                                 registers(to_integer(unsigned(write_address))) <= din;
                         end if;
                 end if;
